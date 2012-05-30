@@ -4,7 +4,7 @@ JPEGrescan is a perl script that uses jpeg tools to optimize jpeg compression by
 
 ## Usage
 
-``` jpegrescan in.jpg out.jpg ```
+```$ jpegrescan in.jpg out.jpg ```
 
 ## Thanks
 
