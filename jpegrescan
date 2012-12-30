@@ -11,8 +11,8 @@ $ftmp = "/tmp/$$.scan";
 $jtmp = "/tmp/$$.jpg";
 $verbose = $v;
 $quiet = $q;
-@restart = $r ? ("-restart", 1) : ();
-undef $_ for $v,$q,$r;
+@strip = $s ? ("-copy","none") : ("-copy","all");
+undef $_ for $v,$q,$s;
 undef $/;
 $|=1;
 
@@ -20,7 +20,7 @@ $|=1;
 # FIXME there's still a bunch of redundant computation in separate calls to jpegtran
 open $OLDERR, ">&", STDERR;
 open STDERR, ">", $ftmp;
-open TRAN, "-|", "jpegtran", "-v", "-optimize", $fin or die;
+open TRAN, "-|", "jpegtran", "-v", @strip, "-optimize", $fin or die;
 write_file($jtmp, <TRAN>);
 close TRAN;
 open STDERR, ">&", $OLDERR;
@@ -48,7 +48,7 @@ sub try {
     my $txt = canonize(shift);
     return $memo{$txt} if $memo{$txt};
     write_file($ftmp, $txt);
-    open TRAN, "-|", "jpegtran", "-scans", $ftmp, @restart, $jtmp or die;
+    open TRAN, "-|", "jpegtran", @strip, "-scans", $ftmp, $jtmp or die;
     $data = <TRAN>;
     close TRAN;
     my $s = length $data;
@@ -84,7 +84,8 @@ if($rgb) {
     # 012 helps very little
     # 0/12 and 0/1/2 are pretty evenly matched in frequency, but 0/12 wins in total size if every image had to use the same mode
     # dc refinement passes never help
-    $dc = tries("0: 0 0 0 0; 1 2: 0 0 0 0;",
+    $dc = tries(
+    #           "0: 0 0 0 0; 1 2: 0 0 0 0;", # two scans expose a bug in Opera <= 11.61
                 "0: 0 0 0 0; 1: 0 0 0 0; 2: 0 0 0 0;");
     # jpegtran won't let me omit dc entirely, but I can at least quantize it away to make the rest of the tests faster.
     $prefix = "0 1 2: 0 0 0 9;";
