@@ -129,7 +129,7 @@ $size = $memo{$mode};
 !$quiet && print "\n$mode\n$size\n";
 $old_size = -s $fin;
 !$quiet && printf "%+.2f%%\n", ($size/$old_size-1)*100;
-if($size > $old_size && !@restart) {
+if($size > $old_size) {
     $data = read_file($fin);
 }
 write_file($fout, $data);
