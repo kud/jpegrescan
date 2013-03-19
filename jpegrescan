@@ -1,14 +1,22 @@
 #!/usr/bin/perl -ws
 # jpegrescan by Loren Merritt
-# Last updated: 2008-11-29
+# Last updated: 2008-11-29 / 2013-03-19
 # This code is public domain.
 
 use File::Slurp;
-@ARGV==2 or die "usage: jpegrescan in.jpg out.jpg\ntries various progressive scan orders\n";
+use File::Temp qw/ tempfile /;
+
+@ARGV==2 or die "usage: jpegrescan in.jpg out.jpg
+tries various progressive scan orders
+switches:
+  -s strip from all extra markers (`jpegtran -copy none` otherwise `jpegtran -copy all`)
+  -v verbose output
+  -q supress all output
+";
 $fin = $ARGV[0];
 $fout = $ARGV[1];
-$ftmp = "/tmp/$$.scan";
-$jtmp = "/tmp/$$.jpg";
+(undef, $ftmp) = tempfile(SUFFIX => ".scan");
+$jtmp = $fout;
 $verbose = $v;
 $quiet = $q;
 @strip = $s ? ("-copy","none") : ("-copy","all");
@@ -129,8 +137,7 @@ $size = $memo{$mode};
 !$quiet && print "\n$mode\n$size\n";
 $old_size = -s $fin;
 !$quiet && printf "%+.2f%%\n", ($size/$old_size-1)*100;
-if($size > $old_size && !@restart) {
-    $data = read_file($fin);
+if($size < $old_size) {
+    write_file($fout, $data);
 }
-write_file($fout, $data);
-unlink $ftmp, $jtmp;
+unlink $ftmp;
