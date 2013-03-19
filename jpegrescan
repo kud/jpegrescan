@@ -4,6 +4,8 @@
 # This code is public domain.
 
 use File::Slurp;
+use File::Temp qw/ tempfile /;
+
 @ARGV==2 or die "usage: jpegrescan in.jpg out.jpg
 tries various progressive scan orders
 switches:
@@ -13,7 +15,7 @@ switches:
 ";
 $fin = $ARGV[0];
 $fout = $ARGV[1];
-$ftmp = "/tmp/$$.scan";
+(undef, $ftmp) = tempfile(SUFFIX => ".scan");
 $jtmp = $fout;
 $verbose = $v;
 $quiet = $q;
