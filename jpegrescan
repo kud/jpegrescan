@@ -10,7 +10,7 @@ use File::Temp qw/ tempfile /;
 tries various progressive scan orders
 switches:
   -s strip from all extra markers (`jpegtran -copy none` otherwise `jpegtran -copy all`)
-  -j Remove JFIF sections (resulting JPEGs are not strictly standard.)
+  -i allow optimizations that may be incompatible with some software (implies -s)
   -v verbose output
   -q supress all output
 ";
@@ -20,9 +20,10 @@ $fout = $ARGV[1];
 $jtmp = $fout;
 $verbose = $v;
 $quiet = $q;
-$dojfif = $j;
-@strip = $s ? ("-copy","none") : ("-copy","all");
-undef $_ for $v,$q,$s;
+$incompatible = $i;
+$dostrip = $s || $i;
+@strip = $dostrip ? ("-copy","none") : ("-copy","all");
+undef $_ for $v,$q,$s,$i;
 undef $/;
 $|=1;
 
@@ -31,8 +32,16 @@ $|=1;
 open $OLDERR, ">&", STDERR;
 open STDERR, ">", $ftmp;
 open TRAN, "-|", "jpegtran", "-v", @strip, "-optimize", $fin or die;
-write_file($jtmp, <TRAN>);
+$data = <TRAN>;
 close TRAN;
+# Strictly speaking, jfifremove does not generate a compliant JPEG file.
+# However, this is our temp file.  It will always be run by jpegtran again.
+# So this gets rid of all existing JFIF segments.
+# And jpegtran will insert a minimal (18-byte) JFIF segment.
+# (Which -o will remove again if requested!)
+$data = jfifremove($data) if($dostrip);
+write_file($jtmp, $data);
+undef $data;
 open STDERR, ">&", $OLDERR;
 
 $type = read_file($ftmp);
@@ -50,6 +59,7 @@ sub jfifremove {
     #print "Deleting $len bytes.\n";
     $file =~ s/^(\xff\xd8)\xff\xe0.{$len}/$1/;
   }
+  !$quiet && print $verbose ? "Removed ".(length($_[0])-length($file)-($incompatible?0:18))." jfif bytes.\n".length($file)."\n\n" : ".";
   return $file;
 }
 
@@ -78,7 +88,6 @@ sub try {
     open TRAN, "-|", "jpegtran", @strip, "-scans", $ftmp, $jtmp or die;
     $data = <TRAN>;
     close TRAN;
-    $data = jfifremove($data) if $dojfif;
     my $s = length $data;
     $s or die;
     $memo{$txt} = $s;
@@ -112,9 +121,10 @@ if($rgb) {
     # 012 helps very little
     # 0/12 and 0/1/2 are pretty evenly matched in frequency, but 0/12 wins in total size if every image had to use the same mode
     # dc refinement passes never help
-    $dc = tries(
-    #           "0: 0 0 0 0; 1 2: 0 0 0 0;", # two scans expose a bug in Opera <= 11.61
-                "0: 0 0 0 0; 1: 0 0 0 0; 2: 0 0 0 0;");
+    my @tries = ("0: 0 0 0 0; 1: 0 0 0 0; 2: 0 0 0 0;");
+    # two scans expose a bug in Opera <= 11.61
+    unshift(@tries, "0: 0 0 0 0; 1 2: 0 0 0 0;") if $incompatible;
+    $dc = tries(@tries);
     # jpegtran won't let me omit dc entirely, but I can at least quantize it away to make the rest of the tests faster.
     $prefix = "0 1 2: 0 0 0 9;";
 } else {
@@ -153,7 +163,8 @@ $prefix = "";
 undef %memo;
 $mode = canonize($dc.$ac);
 try($mode, 1);
-$size = $memo{$mode};
+$data = jfifremove($data) if($incompatible);
+$size = length $data;
 !$quiet && print "\n$mode\n$size\n";
 $old_size = -s $fin;
 !$quiet && printf "%+.2f%%\n", ($size/$old_size-1)*100;
