@@ -6,6 +6,13 @@ JPEGrescan is a perl script that uses jpeg tools to optimize jpeg compression by
 
 ```$ jpegrescan in.jpg out.jpg ```
 
+### Arguments
+
+* -s: Removes all Exif data and now all JFIF data as well.  (A basic 18-byte JFIF segment is added in its place.)
+* -i: Allows optimizations that may be "incompatible" with some software.  Currently this means removing *all* JFIF data (saving 18 bytes) and allowing an encoding not supported by Opera before version 11.61.
+* -v verbose output
+* -q supress all output
+
 ## Thanks
 
-As this script didn't have any homepage (coming from a pastebin), I wanted to host it on github. All thanks to **Loren Merritt** who created this script.
+First, thanks to **Loren Merritt** who created this script originally.  Also, thanks to the people on devshed.com and lyncd.com - whose names seem to be lost to the sands of time - who came up with the jfifremove idea and basic C code.
