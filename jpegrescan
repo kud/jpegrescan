@@ -80,10 +80,9 @@ sub canonize {
 
 # Arguments:
 # - Shift string
-# - Force flag - make $data available as a side-effect even if this case has been run before.
 sub try {
     my $txt = canonize(shift);
-    return $memo{$txt} if($memo{$txt} && !shift);
+    return $memo{$txt} if($memo{$txt});
     write_file($ftmp, $txt);
     open TRAN, "-|", "jpegtran", @strip, "-scans", $ftmp, $jtmp or die;
     $data = <TRAN>;
@@ -162,7 +161,7 @@ foreach $c (0..$rgb) {
 $prefix = "";
 undef %memo;
 $mode = canonize($dc.$ac);
-try($mode, 1);
+try($mode);
 $data = jfifremove($data) if($incompatible);
 $size = length $data;
 !$quiet && print "\n$mode\n$size\n";
