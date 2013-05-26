@@ -5,13 +5,14 @@
 
 use File::Slurp;
 use File::Temp qw/ tempfile /;
-use threads;
+require threads if $t;
 
 @ARGV==2 or die "usage: jpegrescan in.jpg out.jpg
 tries various progressive scan orders
 switches:
   -s strip from all extra markers (`jpegtran -copy none` otherwise `jpegtran -copy all`)
   -i allow optimizations that may be incompatible with some software (implies -s)
+  -t use multiple threads (usually 3.)  Faster, but not 3x faster.
   -v verbose output
   -q supress all output
 ";
@@ -21,10 +22,15 @@ $fout = $ARGV[1];
 $jtmp = $fout;
 $verbose = $v;
 $quiet = $q;
+if($t) {
+  $triesn = \&triesnthreads;
+} else {
+  $triesn = \&triesn;
+}
 $incompatible = $i;
 $dostrip = $s || $i;
 @strip = $dostrip ? ("-copy","none") : ("-copy","all");
-undef $_ for $v,$q,$s,$i;
+undef $_ for $v,$q,$t,$s,$i;
 undef $/;
 $|=1;
 
@@ -103,7 +109,7 @@ sub try {
 
 $maxtries = -1;
 
-sub triesn {
+sub triesnthreads {
   my($bmode, $bsize);
   my ($limit, @modes) = @_;
   my @modethread;
@@ -124,7 +130,24 @@ sub triesn {
   return $bmode;
 }
 
-sub tries { triesn(99, @_); }
+sub triesn {
+    my($bmode, $bsize);
+    my ($limit, @modes) = @_;
+    my $overshoot = 0;
+    for(@modes) {
+        my $s = try($_);
+        if(!$bsize || $s < $bsize) {
+            $bsize = $s;
+            $bmode = $_;
+            $overshoot = 0;
+        } elsif(++$overshoot >= $limit) {
+            last;
+        }
+    }
+    return $bmode;
+}
+
+sub tries { &$triesn(99, @_); }
 
 $prefix = "";
 $suffix = "";
@@ -154,9 +177,9 @@ if($rgb) {
 sub try_splits {
     my $str = shift;
     my %n = map {$_ => sprintf "$c: 1 %d $str; $c: %d 63 $str;", $_, $_+1} 2,5,8,12,18;
-    my $mode = triesn(2, "$c: 1 63 $str;", @n{2,8,5});
+    my $mode = &$triesn(2, "$c: 1 63 $str;", @n{2,8,5});
     return $mode if $mode ne $n{8};
-    return triesn(1, $mode, @n{12,18});
+    return &$triesn(1, $mode, @n{12,18});
 }
 
 foreach $c (0..$rgb) {
@@ -166,7 +189,7 @@ foreach $c (0..$rgb) {
         push @modes, "$c: 1 8 0 $_; $c: 9 63 0 $_;".$ml;
         $ml .= sprintf("$c: 1 63 %d %d;", $_+1, $_);
     }
-    my $refine = triesn(1, @modes);
+    my $refine = &$triesn(1, @modes);
     $refine =~ s/.* (0 \d);//;
     $ac .= $refine . try_splits($1);
 }
