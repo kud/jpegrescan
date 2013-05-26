@@ -5,6 +5,7 @@
 
 use File::Slurp;
 use File::Temp qw/ tempfile /;
+use threads;
 
 @ARGV==2 or die "usage: jpegrescan in.jpg out.jpg
 tries various progressive scan orders
@@ -83,32 +84,44 @@ sub canonize {
 sub try {
     my $txt = canonize(shift);
     return $memo{$txt} if($memo{$txt});
-    write_file($ftmp, $txt);
-    open TRAN, "-|", "jpegtran", @strip, "-scans", $ftmp, $jtmp or die;
+    my $lftmp = $ftmp;
+    $lftmp .= shift if($#_ == 0);
+    write_file($lftmp, $txt);
+    open TRAN, "-|", "jpegtran", @strip, "-scans", $lftmp, $jtmp or die;
     $data = <TRAN>;
     close TRAN;
     my $s = length $data;
     $s or die;
-    $memo{$txt} = $s;
     !$quiet && print $verbose ? "$txt\n$s\n\n" : ".";
-    return $s;
+    if($ftmp eq $lftmp) { # Only if this isn't in a thread.
+      $memo{$txt} = $s;
+      return $s;
+    } else {
+      return ($s, $txt);
+    }
 }
 
+$maxtries = -1;
+
 sub triesn {
-    my($bmode, $bsize);
-    my ($limit, @modes) = @_;
-    my $overshoot = 0;
-    for(@modes) {
-        my $s = try($_);
-        if(!$bsize || $s < $bsize) {
-            $bsize = $s;
-            $bmode = $_;
-            $overshoot = 0;
-        } elsif(++$overshoot >= $limit) {
-            last;
-        }
+  my($bmode, $bsize);
+  my ($limit, @modes) = @_;
+  my @modethread;
+  $limit = $#modes;# if($#modes < $limit);
+  for(my $i=0; $i <= $limit; $i++) {
+    push @modethread, threads->create(\&try, $modes[$i], $i);
+  }
+  $maxtries = $#modes if($#modes > $maxtries);
+  for(my $i=0; $i <= $limit; $i++) {
+    my ($s,$cmode) = $modethread[$i]->join();
+    # Do this outside the thread, to make sure it's saved.
+    $memo{$cmode} = $s if(defined($cmode));
+    if(!$bsize || $s < $bsize) {
+      $bsize = $s;
+      $bmode = $modes[$i];
     }
-    return $bmode;
+  }
+  return $bmode;
 }
 
 sub tries { triesn(99, @_); }
@@ -171,3 +184,7 @@ if($size < $old_size) {
     write_file($fout, $data);
 }
 unlink $ftmp;
+for(my $i=0; $i <= $maxtries; $i++) {
+  unlink $ftmp.$i;
+}
+
