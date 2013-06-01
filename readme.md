@@ -10,6 +10,7 @@ JPEGrescan is a perl script that uses jpeg tools to optimize jpeg compression by
 
 * -s: Removes all Exif data and now all JFIF data as well.  (A basic 18-byte JFIF segment is added in its place.)
 * -i: Allows optimizations that may be "incompatible" with some software.  Currently this means removing *all* JFIF data (saving 18 bytes) and allowing an encoding not supported by Opera before version 11.61.
+* -t: Turns on multithreaded operation.  Usually, uses up to 3 threads.  Faster, but not three times faster than without -t.  So try xargs -n1 -P for many jpegs.
 * -v verbose output
 * -q supress all output
 
