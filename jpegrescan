@@ -112,7 +112,7 @@ if($rgb) {
 sub try_splits {
     my $str = shift;
     my %n = map {$_ => sprintf "$c: 1 %d $str; $c: %d 63 $str;", $_, $_+1} 2,5,8,12,18;
-    my $mode = triesn(2, "$c: 1 63 $str;", @n{2,8,5});
+    my $mode = triesn(3, "$c: 1 63 $str;", @n{2,8,5});
     return $mode if $mode ne $n{8};
     return triesn(1, $mode, @n{12,18});
 }
