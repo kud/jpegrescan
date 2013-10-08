@@ -12,6 +12,7 @@ switches:
   -s strip from all extra markers (`jpegtran -copy none` otherwise `jpegtran -copy all`)
   -v verbose output
   -q supress all output
+  -a use arithmetic coding (unsupported by most software)
 ";
 $fin = $ARGV[0];
 $fout = $ARGV[1];
@@ -20,7 +21,8 @@ $jtmp = $fout;
 $verbose = $v;
 $quiet = $q;
 @strip = $s ? ("-copy","none") : ("-copy","all");
-undef $_ for $v,$q,$s;
+@arith = $a ? ("-arithmetic") : ();
+undef $_ for $v,$q,$s,$a;
 undef $/;
 $|=1;
 
@@ -56,7 +58,7 @@ sub try {
     my $txt = canonize(shift);
     return $memo{$txt} if $memo{$txt};
     write_file($ftmp, $txt);
-    open TRAN, "-|", "jpegtran", @strip, "-scans", $ftmp, $jtmp or die;
+    open TRAN, "-|", "jpegtran", @arith, @strip, "-scans", $ftmp, $jtmp or die;
     $data = <TRAN>;
     close TRAN;
     my $s = length $data;
