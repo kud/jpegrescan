@@ -4,11 +4,14 @@
 
 use File::Slurp;
 use File::Temp qw/ tempfile /;
+require threads if $t;
 
 @ARGV==2 or die "usage: jpegrescan in.jpg out.jpg
 tries various progressive scan orders
 switches:
   -s strip from all extra markers (`jpegtran -copy none` otherwise `jpegtran -copy all`)
+  -i allow optimizations that may be incompatible with some software (implies -s)
+  -t use multiple threads (usually 3.)  Faster, but not 3x faster.
   -v verbose output
   -q supress all output
   -a use arithmetic coding (unsupported by most software)
@@ -19,9 +22,16 @@ $fout = $ARGV[1];
 $jtmp = $fout;
 $verbose = $v;
 $quiet = $q;
-@strip = $s ? ("-copy","none") : ("-copy","all");
+if($t) {
+  $triesn = \&triesnthreads;
+} else {
+  $triesn = \&triesn;
+}
+$incompatible = $i;
+$dostrip = $s || $i;
+@strip = $dostrip ? ("-copy","none") : ("-copy","all");
 @arith = $a ? ("-arithmetic") : ();
-undef $_ for $v,$q,$s,$a;
+undef $_ for $v,$q,$t,$s,$i,$a;
 undef $/;
 $|=1;
 
@@ -30,13 +40,36 @@ $|=1;
 open $OLDERR, ">&", STDERR;
 open STDERR, ">", $ftmp;
 open TRAN, "-|", "jpegtran", "-v", @strip, "-optimize", $fin or die;
-write_file($jtmp, <TRAN>);
+$data = <TRAN>;
 close TRAN;
+# Strictly speaking, jfifremove does not generate a compliant JPEG file.
+# However, this is our temp file.  It will always be run by jpegtran again.
+# So this gets rid of all existing JFIF segments.
+# And jpegtran will insert a minimal (18-byte) JFIF segment.
+# (Which -o will remove again if requested!)
+$data = jfifremove($data) if($dostrip);
+write_file($jtmp, $data);
+undef $data;
 open STDERR, ">&", $OLDERR;
 
 $type = read_file($ftmp);
 $type =~ /components=(\d+)/ or die;
 $rgb = $1==3 ? 1 : $1==1 ? 0 : die "not RGB nor gray\n";
+
+# Remove JFIF sections, written by Ken Brazier.
+# Based on http://lyncd.com/files/imgopt/jfifremove.c
+# Based on http://archives.devshed.com/forums/compression-130/question-about-using-jpegtran-for-lossless-compression-of-jpegs-2013044.html
+sub jfifremove {
+  my $file = $_[0];
+  while($file =~ /^\xff\xd8\xff\xe0(.)(.)/) {
+    # Next 2 bytes after APP0 are length of JFIF segment *excluding* APP0, but including themselves.
+    my $len = ord($1)*256+ord($2);
+    #print "Deleting $len bytes.\n";
+    $file =~ s/^(\xff\xd8)\xff\xe0.{$len}/$1/;
+  }
+  !$quiet && print $verbose ? "Removed ".(length($_[0])-length($file)-($incompatible?0:18))." jfif bytes.\n".length($file)."\n\n" : ".";
+  return $file;
+}
 
 # FIXME optimize order for either progressive transfer or decoding speed
 sub canonize {
@@ -53,18 +86,49 @@ sub canonize {
     return join "\n", @txt;
 }
 
+# Arguments:
+# - Shift string
 sub try {
     my $txt = canonize(shift);
     return $memo{$txt} if $memo{$txt};
-    write_file($ftmp, $txt);
-    open TRAN, "-|", "jpegtran", @arith, @strip, "-scans", $ftmp, $jtmp or die;
+    my $lftmp = $ftmp;
+    $lftmp .= shift if($#_ == 0);
+    write_file($lftmp, $txt);
+    open TRAN, "-|", "jpegtran", @arith, @strip, "-scans", $lftmp, $jtmp or die;
     $data = <TRAN>;
     close TRAN;
     my $s = length $data;
     $s or die;
-    $memo{$txt} = $s;
     !$quiet && print $verbose ? "$txt\n$s\n\n" : ".";
-    return $s;
+    if($ftmp eq $lftmp) { # Only if this isn't in a thread.
+      $memo{$txt} = $s;
+      return $s;
+    } else {
+      return ($s, $txt);
+    }
+}
+
+$maxtries = -1;
+
+sub triesnthreads {
+  my($bmode, $bsize);
+  my ($limit, @modes) = @_;
+  my @modethread;
+  $limit = $#modes;# if($#modes < $limit);
+  for(my $i=0; $i <= $limit; $i++) {
+    push @modethread, threads->create(\&try, $modes[$i], $i);
+  }
+  $maxtries = $#modes if($#modes > $maxtries);
+  for(my $i=0; $i <= $limit; $i++) {
+    my ($s,$cmode) = $modethread[$i]->join();
+    # Do this outside the thread, to make sure it's saved.
+    $memo{$cmode} = $s if(defined($cmode));
+    if(!$bsize || $s < $bsize) {
+      $bsize = $s;
+      $bmode = $modes[$i];
+    }
+  }
+  return $bmode;
 }
 
 sub triesn {
@@ -84,7 +148,7 @@ sub triesn {
     return $bmode;
 }
 
-sub tries { triesn(99, @_); }
+sub tries { &$triesn(99, @_); }
 
 $prefix = "";
 $suffix = "";
@@ -93,9 +157,10 @@ if($rgb) {
     # 012 helps very little
     # 0/12 and 0/1/2 are pretty evenly matched in frequency, but 0/12 wins in total size if every image had to use the same mode
     # dc refinement passes never help
-    $dc = tries(
-    #           "0: 0 0 0 0; 1 2: 0 0 0 0;", # two scans expose a bug in Opera <= 11.61
-                "0: 0 0 0 0; 1: 0 0 0 0; 2: 0 0 0 0;");
+    my @tries = ("0: 0 0 0 0; 1: 0 0 0 0; 2: 0 0 0 0;");
+    # two scans expose a bug in Opera <= 11.61
+    unshift(@tries, "0: 0 0 0 0; 1 2: 0 0 0 0;") if $incompatible;
+    $dc = tries(@tries);
     # jpegtran won't let me omit dc entirely, but I can at least quantize it away to make the rest of the tests faster.
     $prefix = "0 1 2: 0 0 0 9;";
 } else {
@@ -113,9 +178,9 @@ if($rgb) {
 sub try_splits {
     my $str = shift;
     my %n = map {$_ => sprintf "$c: 1 %d $str; $c: %d 63 $str;", $_, $_+1} 2,5,8,12,18;
-    my $mode = triesn(3, "$c: 1 63 $str;", @n{2,8,5});
+    my $mode = &$triesn(3, "$c: 1 63 $str;", @n{2,8,5});
     return $mode if $mode ne $n{8};
-    return triesn(2, $mode, @n{12,18});
+    return &$triesn(2, $mode, @n{12,18});
 }
 
 foreach $c (0..$rgb) {
@@ -125,7 +190,7 @@ foreach $c (0..$rgb) {
         push @modes, "$c: 1 8 0 $_; $c: 9 63 0 $_;".$ml;
         $ml .= sprintf("$c: 1 63 %d %d;", $_+1, $_);
     }
-    my $refine = triesn(1, @modes);
+    my $refine = &$triesn(1, @modes);
     $refine =~ s/.* (0 \d);//;
     $ac .= $refine . try_splits($1);
 }
@@ -134,7 +199,8 @@ $prefix = "";
 undef %memo;
 $mode = canonize($dc.$ac);
 try($mode);
-$size = $memo{$mode};
+$data = jfifremove($data) if($incompatible);
+$size = length $data;
 !$quiet && print "\n$mode\n$size\n";
 $old_size = -s $fin;
 !$quiet && printf "%+.2f%%\n", ($size/$old_size-1)*100;
@@ -142,3 +208,7 @@ if($size <= $old_size) {
     write_file($fout, $data);
 }
 unlink $ftmp;
+for(my $i=0; $i <= $maxtries; $i++) {
+  unlink $ftmp.$i;
+}
+
