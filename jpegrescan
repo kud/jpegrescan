@@ -1,6 +1,5 @@
 #!/usr/bin/perl -ws
 # jpegrescan by Loren Merritt
-# Last updated: 2008-11-29 / 2013-03-19
 # This code is public domain.
 
 use File::Slurp;
@@ -15,6 +14,7 @@ switches:
   -t use multiple threads (usually 3.)  Faster, but not 3x faster.
   -v verbose output
   -q supress all output
+  -a use arithmetic coding (unsupported by most software)
 ";
 $fin = $ARGV[0];
 $fout = $ARGV[1];
@@ -30,7 +30,8 @@ if($t) {
 $incompatible = $i;
 $dostrip = $s || $i;
 @strip = $dostrip ? ("-copy","none") : ("-copy","all");
-undef $_ for $v,$q,$t,$s,$i;
+@arith = $a ? ("-arithmetic") : ();
+undef $_ for $v,$q,$t,$s,$i,$a;
 undef $/;
 $|=1;
 
@@ -89,11 +90,11 @@ sub canonize {
 # - Shift string
 sub try {
     my $txt = canonize(shift);
-    return $memo{$txt} if($memo{$txt});
+    return $memo{$txt} if $memo{$txt};
     my $lftmp = $ftmp;
     $lftmp .= shift if($#_ == 0);
     write_file($lftmp, $txt);
-    open TRAN, "-|", "jpegtran", @strip, "-scans", $lftmp, $jtmp or die;
+    open TRAN, "-|", "jpegtran", @arith, @strip, "-scans", $lftmp, $jtmp or die;
     $data = <TRAN>;
     close TRAN;
     my $s = length $data;
@@ -177,9 +178,9 @@ if($rgb) {
 sub try_splits {
     my $str = shift;
     my %n = map {$_ => sprintf "$c: 1 %d $str; $c: %d 63 $str;", $_, $_+1} 2,5,8,12,18;
-    my $mode = &$triesn(2, "$c: 1 63 $str;", @n{2,8,5});
+    my $mode = &$triesn(3, "$c: 1 63 $str;", @n{2,8,5});
     return $mode if $mode ne $n{8};
-    return &$triesn(1, $mode, @n{12,18});
+    return &$triesn(2, $mode, @n{12,18});
 }
 
 foreach $c (0..$rgb) {
@@ -203,7 +204,7 @@ $size = length $data;
 !$quiet && print "\n$mode\n$size\n";
 $old_size = -s $fin;
 !$quiet && printf "%+.2f%%\n", ($size/$old_size-1)*100;
-if($size < $old_size) {
+if($size <= $old_size) {
     write_file($fout, $data);
 }
 unlink $ftmp;
