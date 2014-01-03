@@ -42,6 +42,7 @@ open STDERR, ">", $ftmp;
 open TRAN, "-|", "jpegtran", "-v", @strip, "-optimize", $fin or die;
 $data = <TRAN>;
 close TRAN;
+open STDERR, ">&", $OLDERR;
 # Strictly speaking, jfifremove does not generate a compliant JPEG file.
 # However, this is our temp file.  It will always be run by jpegtran again.
 # So this gets rid of all existing JFIF segments.
@@ -50,7 +51,6 @@ close TRAN;
 $data = jfifremove($data) if($dostrip);
 write_file($jtmp, $data);
 undef $data;
-open STDERR, ">&", $OLDERR;
 
 $type = read_file($ftmp);
 $type =~ /components=(\d+)/ or die;
@@ -65,7 +65,10 @@ sub jfifremove {
     # Next 2 bytes after APP0 are length of JFIF segment *excluding* APP0, but including themselves.
     my $len = ord($1)*256+ord($2);
     #print "Deleting $len bytes.\n";
-    $file =~ s/^(\xff\xd8)\xff\xe0.{$len}/$1/;
+    unless($file =~ s/^(\xff\xd8)\xff\xe0.{$len}/$1/s) {
+      warn "Problem with JFIF segment of length $len" unless $quiet;
+      return $file;
+    }
   }
   !$quiet && print $verbose ? "Removed ".(length($_[0])-length($file)-($incompatible?0:18))." jfif bytes.\n".length($file)."\n\n" : ".";
   return $file;
