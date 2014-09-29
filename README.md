@@ -15,6 +15,10 @@ JPEGrescan is a perl script that uses jpeg tools to optimize jpeg compression by
 * -v: verbose output
 * -q: supress all output
 
+##Issues 
+* No out.jpg - Install the below packages to solve this issue
+  yum -y install perl-File-Slurp libjpeg-turbo-utils 
+
 ## Thanks
 
 First, thanks to **Loren Merritt** who created this script originally.  Also, thanks to the people on devshed.com and lyncd.com - whose names seem to be lost to the sands of time - who came up with the jfifremove idea and basic C code.
