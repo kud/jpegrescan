@@ -19,7 +19,8 @@ NB: [MozJPEG](https://github.com/mozilla/mozjpeg) has the same optimization buil
 
 ##Issues 
 * No out.jpg - Install the below packages to solve this issue
-  yum -y install perl-File-Slurp libjpeg-turbo-utils 
+  Fedora: yum -y install perl-File-Slurp libjpeg-turbo-utils 
+  Debian: aptitude install -y libfile-slurp-perl libjpeg-turbo-progs
 
 ## Thanks
 
