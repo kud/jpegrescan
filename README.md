@@ -15,7 +15,7 @@ NB: [MozJPEG](https://github.com/mozilla/mozjpeg) has the same optimization buil
 * -t: Turns on multithreaded operation.  Usually, uses up to 4 threads.  Faster, but not four times faster than without -t.  So try xargs -n1 -P to shrink a large number of jpegs at the same time.
 * -a: Turns on arithmetic coding. (Unsupported by most software.)  
 * -v: verbose output
-* -q: supress all output
+* -q: suppress all output
 
 ##Issues 
 * No out.jpg - Install the below packages to solve this issue
