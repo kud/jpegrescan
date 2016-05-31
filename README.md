@@ -2,7 +2,7 @@
 
 JPEGrescan is a perl script that uses jpeg tools to optimize jpeg compression by micro-managing some of the compression math based on research into some of the most common parameters.
 
-NB: [MozJPEG](https://github.com/mozilla/mozjpeg) has the same optimization built in and is faster, so we recommend using MozJPEG when possible.
+NB: [MozJPEG](https://github.com/mozilla/mozjpeg) has the same optimisation built-in and is faster, so we recommend using MozJPEG when possible.
 
 ## Usage
 
