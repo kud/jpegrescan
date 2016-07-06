@@ -9,12 +9,12 @@ require threads if $t;
 @ARGV==2 or die "usage: jpegrescan in.jpg out.jpg
 tries various progressive scan orders
 switches:
-  -s strip from all extra markers (`jpegtran -copy none` otherwise `jpegtran -copy all`)
-  -i allow optimizations that may be incompatible with some software (implies -s)
-  -t use multiple threads (usually 3.)  Faster, but not 3x faster.
-  -v verbose output
-  -q supress all output
-  -a use arithmetic coding (unsupported by most software)
+  -s Strip from all extra markers (`jpegtran -copy none` otherwise `jpegtran -copy all`).
+  -i Allow optimizations that may be incompatible with some software (implies -s).
+  -t Use multiple threads (usually 3).  Faster, but not 3x faster.
+  -a Use arithmetic coding. Unsupported by most software.
+  -v Verbose output.
+  -q Supress all output.
 ";
 $fin = $ARGV[0];
 $fout = $ARGV[1];
@@ -214,4 +214,3 @@ unlink $ftmp;
 for(my $i=0; $i <= $maxtries; $i++) {
   unlink $ftmp.$i;
 }
-
