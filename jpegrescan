@@ -14,7 +14,7 @@ switches:
   -t Use multiple threads (usually 3).  Faster, but not 3x faster.
   -a Use arithmetic coding. Unsupported by most software.
   -v Verbose output.
-  -q Supress all output.
+  -q Suppress all output.
 ";
 $fin = $ARGV[0];
 $fout = $ARGV[1];
