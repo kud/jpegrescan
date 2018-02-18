@@ -176,7 +176,7 @@ if($rgb) {
 # refinement passes have some chance of being split (luma: 4%,4%,4%. chroma: 20%,8%) but the total bit gain is negligible.
 # msb pass should almost always be split (luma: 87%, chroma: 81%).
 # I have no theoretical reason for this list of split positions, they're just the most common in practice.
-# splitting into 3 ections is often slightly better, but the total number of bits saved is negligible.
+# splitting into 3 sections is often slightly better, but the total number of bits saved is negligible.
 # FIXME: penalize lots of refinement passes because it's slower to decode. if so, then also force overwrite if bigger than the input.
 sub try_splits {
     my $str = shift;
