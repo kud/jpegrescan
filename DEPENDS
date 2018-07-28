@@ -1,0 +1,3 @@
+Project: jpegrescan-perl
+Homepage: https://github.com/kud/jpegrescan
+Depends: perl, libfile-slurp-perl, libjpeg-progs
