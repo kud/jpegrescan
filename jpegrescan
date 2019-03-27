@@ -61,7 +61,7 @@ $rgb = $1==3 ? 1 : $1==1 ? 0 : die "not RGB nor gray\n";
 # Based on http://archives.devshed.com/forums/compression-130/question-about-using-jpegtran-for-lossless-compression-of-jpegs-2013044.html
 sub jfifremove {
   my $file = $_[0];
-  while($file =~ /^\xff\xd8\xff\xe0(.)(.)/) {
+  while($file =~ /^\xff\xd8\xff\xe0(.)(.)/s) {
     # Next 2 bytes after APP0 are length of JFIF segment *excluding* APP0, but including themselves.
     my $len = ord($1)*256+ord($2);
     #print "Deleting $len bytes.\n";
